@@ -7,17 +7,20 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.widget.RemoteViews
+import java.io.File
 import java.util.concurrent.TimeUnit
 
 /**
  * Home-screen widget for controlling wireless ADB (ADB over TLS) on a rooted device.
  *
- * Root is obtained through Magisk su by invoking the device-side script:
- *   /data/adb/adb_wifi_ctl.sh {toggle|status}
+ * The control/keepalive scripts are shipped as APK assets and self-deployed into
+ * the app's private files dir on first run (no root needed to write our own dir).
+ * Root is obtained via Magisk su to execute the script:
+ *   <filesDir>/adb_wifi_ctl.sh {toggle|status}
  *
- * No foreground service: state is refreshed only when the user taps the widget
- * or when the system delivers an APPWIDGET_UPDATE. updatePeriodMillis is 0 in
- * widget_info.xml, so in practice refresh is tap-driven.
+ * Uninstall-safe: scripts live in the private dir, so uninstalling the APK
+ * (adb OR via Settings/launcher) removes them; the daemon detects its own file
+ * is gone and exits. No service.d / boot receiver / foreground service at all.
  *
  * All su calls run off the main thread via goAsync() to avoid ANR.
  */
@@ -26,10 +29,15 @@ class AdbWifiWidget : AppWidgetProvider() {
     companion object {
         private const val ACTION_TOGGLE = "com.adbwifitoggle.TOGGLE"
         private const val ACTION_REFRESH = "com.adbwifitoggle.REFRESH"
-        private const val CTL = "/data/adb/adb_wifi_ctl.sh"
 
         private const val REQ_TOGGLE = 1
         private const val REQ_REFRESH = 2
+
+        // Bump together with versionCode in build.gradle.kts when a script
+        // changes, so ensureDeployed() overwrites the on-device copy.
+        private const val SCRIPTS_VERSION = 4
+        private const val ASSET_CTL = "adb_wifi_ctl.sh"
+        private const val ASSET_DAEMON = "adb_wifi_daemon.sh"
     }
 
     override fun onUpdate(
@@ -37,11 +45,10 @@ class AdbWifiWidget : AppWidgetProvider() {
         appWidgetManager: AppWidgetManager,
         appWidgetIds: IntArray
     ) {
-        // onUpdate is dispatched synchronously from onReceive; goAsync() is
-        // still valid here because onReceive has not returned yet.
         val result = goAsync()
         Thread {
             try {
+                ensureDeployed(context)
                 appWidgetIds.forEach { render(context, appWidgetManager, it) }
             } finally {
                 result.finish()
@@ -55,7 +62,10 @@ class AdbWifiWidget : AppWidgetProvider() {
                 val result = goAsync()
                 Thread {
                     try {
-                        if (intent.action == ACTION_TOGGLE) runRoot("$CTL toggle")
+                        ensureDeployed(context)
+                        if (intent.action == ACTION_TOGGLE) {
+                            runRoot("${ctlPath(context)} toggle")
+                        }
                         refreshAll(context)
                     } finally {
                         result.finish()
@@ -74,7 +84,7 @@ class AdbWifiWidget : AppWidgetProvider() {
 
     /** Render one widget instance: read state via root, then push RemoteViews. */
     private fun render(context: Context, mgr: AppWidgetManager, id: Int) {
-        val raw = runRoot("$CTL status")
+        val raw = runRoot("${ctlPath(context)} status")
         val s = parseKv(raw)
 
         val enabled = s["enabled"] == "1"
@@ -114,6 +124,41 @@ class AdbWifiWidget : AppWidgetProvider() {
         views.setOnClickPendingIntent(R.id.infoArea, refreshPi)
 
         mgr.updateAppWidget(id, views)
+    }
+
+    private fun ctlPath(context: Context): String =
+        File(context.filesDir, ASSET_CTL).absolutePath
+
+    /**
+     * Deploy bundled scripts into our private files dir. The app can write and
+     * chmod its own files without root (verified on-device). Redeploy when the
+     * bundled version is newer. Failure is non-fatal: status then shows "--".
+     */
+    private fun ensureDeployed(context: Context) {
+        val dir = context.filesDir
+        val verFile = File(dir, ".scripts_version")
+        val ctl = File(dir, ASSET_CTL)
+        val daemon = File(dir, ASSET_DAEMON)
+
+        val current = try {
+            verFile.readText().trim().toInt()
+        } catch (t: Throwable) {
+            -1
+        }
+        if (current == SCRIPTS_VERSION && ctl.exists() && daemon.exists()) return
+
+        try {
+            for ((asset, dst) in arrayOf(ASSET_CTL to ctl, ASSET_DAEMON to daemon)) {
+                context.assets.open(asset).use { input ->
+                    dst.outputStream().use { out -> input.copyTo(out) }
+                }
+                dst.setExecutable(true, false)
+                dst.setReadable(true, false)
+            }
+            verFile.writeText(SCRIPTS_VERSION.toString())
+        } catch (t: Throwable) {
+            // Leave old files in place; status will surface any problem.
+        }
     }
 
     private fun parseKv(raw: String): Map<String, String> {
