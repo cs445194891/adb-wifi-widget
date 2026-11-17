@@ -5,35 +5,35 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:background="@drawable/widget_bg"
-    android:padding="12dp">
+    android:padding="10dp">
 
-    <!-- Switch area: tap to toggle -->
+    <!-- 开关区：整块可点，点击切换 -->
     <LinearLayout
         android:id="@+id/switchArea"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:padding="4dp">
+        android:padding="2dp">
 
         <ImageView
-            android:id="@+id/ivLed"
-            android:layout_width="14dp"
-            android:layout_height="14dp"
-            android:src="@drawable/led_off"
-            android:contentDescription="state" />
+            android:id="@+id/ivSwitch"
+            android:layout_width="46dp"
+            android:layout_height="26dp"
+            android:src="@drawable/switch_off"
+            android:contentDescription="toggle" />
 
         <TextView
             android:id="@+id/tvState"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:text="--"
+            android:layout_marginStart="10dp"
+            android:text="关闭"
             android:textColor="#FFFFFF"
-            android:textSize="20sp"
+            android:textSize="17sp"
             android:textStyle="bold" />
 
-        <!-- RemoteViews 禁止 inflate 原生 android.view.View；用 FrameLayout 作占位 spacer -->
+        <!-- RemoteViews 禁止 inflate android.view.View；用 FrameLayout 占位 -->
         <FrameLayout
             android:layout_width="0dp"
             android:layout_height="1dp"
@@ -43,65 +43,106 @@
             android:id="@+id/tvDaemon"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="守护进程: --"
+            android:text="--"
             android:textColor="#B0BEC5"
-            android:textSize="11sp" />
+            android:textSize="10sp" />
     </LinearLayout>
 
-    <!-- RemoteViews 禁止 inflate 原生 android.view.View；用 FrameLayout 作分隔线 -->
+    <!-- 分隔线：同样用 FrameLayout 代替 View -->
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="1dp"
-        android:layout_marginTop="8dp"
-        android:layout_marginBottom="8dp"
+        android:layout_marginTop="7dp"
+        android:layout_marginBottom="7dp"
         android:background="#40FFFFFF" />
 
-    <!-- Info area: tap to refresh -->
+    <!-- 信息区：整块可点，点击刷新；标签左对齐 + 值右对齐 -->
     <LinearLayout
         android:id="@+id/infoArea"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical">
 
-        <TextView
-            android:id="@+id/tvIp"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="IP: --"
-            android:textColor="#FFFFFF"
-            android:textSize="13sp"
-            android:singleLine="true"
-            android:ellipsize="end" />
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
 
-        <TextView
-            android:id="@+id/tvPort"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="端口: --"
-            android:textColor="#FFFFFF"
-            android:textSize="13sp"
-            android:singleLine="true"
-            android:ellipsize="end" />
+            <TextView
+                android:layout_width="34dp"
+                android:layout_height="wrap_content"
+                android:text="IP"
+                android:textColor="#90A4AE"
+                android:textSize="11sp" />
 
-        <TextView
-            android:id="@+id/tvSsid"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="WiFi: --"
-            android:textColor="#FFFFFF"
-            android:textSize="13sp"
-            android:singleLine="true"
-            android:ellipsize="end" />
+            <TextView
+                android:id="@+id/tvIp"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:gravity="end"
+                android:text="--"
+                android:textColor="#FFFFFF"
+                android:textSize="12sp"
+                android:singleLine="true"
+                android:ellipsize="end" />
+        </LinearLayout>
 
-        <TextView
-            android:id="@+id/tvHost"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="授权主机: --"
-            android:textColor="#B0BEC5"
-            android:textSize="11sp"
-            android:singleLine="true"
-            android:ellipsize="end" />
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="3dp">
+
+            <TextView
+                android:layout_width="34dp"
+                android:layout_height="wrap_content"
+                android:text="端口"
+                android:textColor="#90A4AE"
+                android:textSize="11sp" />
+
+            <TextView
+                android:id="@+id/tvPort"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:gravity="end"
+                android:text="--"
+                android:textColor="#FFFFFF"
+                android:textSize="12sp"
+                android:singleLine="true"
+                android:ellipsize="end" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="3dp">
+
+            <TextView
+                android:layout_width="34dp"
+                android:layout_height="wrap_content"
+                android:text="WiFi"
+                android:textColor="#90A4AE"
+                android:textSize="11sp" />
+
+            <TextView
+                android:id="@+id/tvSsid"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:gravity="end"
+                android:text="--"
+                android:textColor="#FFFFFF"
+                android:textSize="12sp"
+                android:singleLine="true"
+                android:ellipsize="end" />
+        </LinearLayout>
+
     </LinearLayout>
 
 </LinearLayout>

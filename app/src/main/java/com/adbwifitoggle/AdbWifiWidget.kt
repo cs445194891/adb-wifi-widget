@@ -82,24 +82,22 @@ class AdbWifiWidget : AppWidgetProvider() {
         val ip = s["ip"] ?: "--"
         val port = s["port"] ?: "--"
         val ssid = s["ssid"] ?: "--"
-        val host = s["host"] ?: "--"
 
         val views = RemoteViews(context.packageName, R.layout.widget)
 
         views.setTextViewText(R.id.tvState, if (enabled) "开启" else "关闭")
         views.setImageViewResource(
-            R.id.ivLed,
-            if (enabled) R.drawable.led_on else R.drawable.led_off
+            R.id.ivSwitch,
+            if (enabled) R.drawable.switch_on else R.drawable.switch_off
         )
         views.setTextViewText(
             R.id.tvDaemon,
-            "守护进程: " + if (daemon) "运行中" else "已停止"
+            if (daemon) "守护·运行" else "守护·停止"
         )
 
-        views.setTextViewText(R.id.tvIp, "IP: $ip")
-        views.setTextViewText(R.id.tvPort, "端口: $port")
-        views.setTextViewText(R.id.tvSsid, "WiFi: $ssid")
-        views.setTextViewText(R.id.tvHost, "授权主机: $host")
+        views.setTextViewText(R.id.tvIp, ip)
+        views.setTextViewText(R.id.tvPort, port)
+        views.setTextViewText(R.id.tvSsid, ssid)
 
         val togglePi = PendingIntent.getBroadcast(
             context, REQ_TOGGLE,
