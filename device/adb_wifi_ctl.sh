@@ -91,7 +91,8 @@ do_status() {
     # Pull the local port from the "*:PORT" field.
     port=$(ss -tlnp 2>/dev/null | grep adbd | head -1 | awk '{for(i=1;i<=NF;i++) if($i ~ /^\*:([0-9]+)$/){sub(/^\*:/,"",$i); print $i; exit}}')
 
-    ssid=$(cmd wifi status 2>/dev/null | grep -i 'SSID:' | head -1 | sed 's/.*SSID:[[:space:]]*//' | tr -d '"')
+    # 取 WifiInfo 行里 "SSID: \"名称\"" 引号内的纯 SSID；避免贪婪匹配吞掉 BSSID 等字段
+    ssid=$(cmd wifi status 2>/dev/null | grep -o 'SSID: "[^"]*"' | head -1 | sed 's/^SSID: "//; s/"$//')
     [ -n "$ssid" ] || ssid=$(dumpsys wifi 2>/dev/null | grep -oE 'ssid: [^ ]+' | tail -1 | cut -d' ' -f2 | tr -d '"')
 
     host=$(tail -1 /data/misc/adb/adb_keys 2>/dev/null | awk '{print $2}')

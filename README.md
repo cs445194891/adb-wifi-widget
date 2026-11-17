@@ -182,17 +182,32 @@ adb reboot
 4. **v2 守护 flag 文件丢失**：默认回退为 1（常开），不会导致调试关闭，但开关可能失灵；
    重装一次 `install-device.sh` 即可。
 
-## 未核实项（诚实标注）
+## 实测验证结论（2026-11-18，小米 thyme / Android 12 / MIUI）
 
-- **两种方式都未实际编译验证**。Kotlin/Gradle 配置基于 AGP 8.1.4 + Kotlin 1.9.10 +
-  compileSdk 34 + Gradle 8.2 的兼容组合（版本对应关系已查官方 AGP 兼容表核实），
-  但本机零环境、在线 workflow 也尚未 push 触发过，第一次构建可能需按报错微调参数。
-- **GitHub Actions workflow 的 action 版本号**已对齐当前稳定版（checkout@v4、
-  setup-java@v4、setup-android@v4、setup-gradle@v6），但 GitHub 版本迭代快，
-  若将来 action 弃用需更新 `build.yml`。
-- `cmd wifi status` 取 SSID 在部分 MIUI 版本上可能返回空，脚本已内置 `dumpsys wifi`
-  作为 fallback，但**未在你的设备上实测这个 fallback 分支**（取证时 `dumpsys wifi` 可见 SSID）。
-- 桌面小组件在各 launcher 上的最小尺寸/缩放表现未实测。
+- **在线编译已验证**：GitHub Actions 构建成功，产物 APK 经 gh-pages 分支取回并装机成功
+  （本机无 JDK/SDK，全程走在线编译）。
+- **小组件渲染已验证**：`widget.xml` 早期用 `<View>` 做占位/分隔线，RemoteViews 白名单禁止
+  inflate `android.view.View`，launcher 渲染时报 `Class not allowed to be inflated`，回退成
+  "载入窗口小部件时出现问题"。已改为 `FrameLayout`（白名单内），桌面正常显示。
+- **su 调用已验证**：`su` 位于 `/product/bin/su`；以 App uid 实测按名字 `su -c` 即可静默成功
+  （Magisk 改包版保留交互式 su），无需改绝对路径。App uid 变化后需重新授权一次即可。
+- **SSID 解析已验证**：从 `cmd wifi status` 的 `WifiInfo: SSID:"..."` 行精确提取引号内名称，
+  实测取到实时 SSID（具体值不记录；此前贪婪 sed 会把 BSSID 一并带出，已修）。
+
+## 仍需注意（诚实标注）
+
+- **每次更新 APK 需先卸载**：GitHub Actions 用 runner 临时 debug keystore 签名，每次构建签名
+  都不同，`adb install -r` 会因签名不匹配失败，必须先 `adb uninstall`。要免卸载更新需固化
+  debug keystore（仓库存 keystore + workflow 配 signingConfig），**尚未做**。
+- **MIUI USB 安装拦截**：adb 直装会被"通过 USB 安装应用"开关拦截，本次用 root 静默安装绕过。
+- **关闭开关会切断无线 adb**：点"关闭"会置 `adb_wifi_enabled=0`；若你正用无线 adb 管理，
+  会立刻失去连接，需手动到开发者选项重开。这是该方案的固有矛盾（用无线 adb 管一个能关
+  无线 adb 的开关），已确认维持现状。
+- **刷新要用 App 自定义 action**：命令行主动刷新应发
+  `su -c "am broadcast -a com.adbwifitoggle.REFRESH -n com.adbwifitoggle/.AdbWifiWidget"`。
+  直接发系统 `android.appwidget.action.APPWIDGET_UPDATE` 且不带 `appWidgetIds` extra 时，
+  `onUpdate` 收到空数组、渲染循环不执行，易被误判为"刷新无效"。
+- **GitHub Actions action 版本、各 launcher 的 widget 缩放表现**随时间/机型变化，届时按实际更新。
 
 ## GitHub Actions 配置的失效条件
 
