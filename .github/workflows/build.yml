@@ -1,0 +1,47 @@
+name: Build ADB WiFi Widget
+
+# 手动触发为主；push 到 main 也会自动构建一次
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          # setup-android 只默认装 platform-tools，这里显式补上编译所需的组件
+          packages: 'platform-tools platforms;android-34 build-tools;34.0.0'
+
+      # 本工程没有 gradle wrapper（无 gradlew / gradle-wrapper.properties），
+      # 因此用 setup-gradle 指定版本并把 gradle 放进 PATH，后续用 gradle 而非 ./gradlew。
+      # AGP 8.1.4 官方要求 Gradle >= 8.0，推荐 8.0-8.2；此处固定 8.2。
+      - name: Setup Gradle 8.2
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '8.2'
+
+      # 用 assembleDebug：默认 debug 签名，产物可直接安装到手机。
+      # （release 构建类型未配置签名，assembleRelease 只会产出未签名 APK，装不上。）
+      - name: Build debug APK
+        run: gradle assembleDebug --no-daemon --stacktrace
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: adb-wifi-widget-debug
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 90

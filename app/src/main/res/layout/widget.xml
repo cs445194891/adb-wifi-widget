@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@drawable/widget_bg"
+    android:padding="12dp">
+
+    <!-- Switch area: tap to toggle -->
+    <LinearLayout
+        android:id="@+id/switchArea"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:padding="4dp">
+
+        <ImageView
+            android:id="@+id/ivLed"
+            android:layout_width="14dp"
+            android:layout_height="14dp"
+            android:src="@drawable/led_off"
+            android:contentDescription="state" />
+
+        <TextView
+            android:id="@+id/tvState"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:text="--"
+            android:textColor="#FFFFFF"
+            android:textSize="20sp"
+            android:textStyle="bold" />
+
+        <View
+            android:layout_width="0dp"
+            android:layout_height="1dp"
+            android:layout_weight="1" />
+
+        <TextView
+            android:id="@+id/tvDaemon"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="守护进程: --"
+            android:textColor="#B0BEC5"
+            android:textSize="11sp" />
+    </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="8dp"
+        android:background="#40FFFFFF" />
+
+    <!-- Info area: tap to refresh -->
+    <LinearLayout
+        android:id="@+id/infoArea"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/tvIp"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="IP: --"
+            android:textColor="#FFFFFF"
+            android:textSize="13sp"
+            android:singleLine="true"
+            android:ellipsize="end" />
+
+        <TextView
+            android:id="@+id/tvPort"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="端口: --"
+            android:textColor="#FFFFFF"
+            android:textSize="13sp"
+            android:singleLine="true"
+            android:ellipsize="end" />
+
+        <TextView
+            android:id="@+id/tvSsid"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="WiFi: --"
+            android:textColor="#FFFFFF"
+            android:textSize="13sp"
+            android:singleLine="true"
+            android:ellipsize="end" />
+
+        <TextView
+            android:id="@+id/tvHost"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="授权主机: --"
+            android:textColor="#B0BEC5"
+            android:textSize="11sp"
+            android:singleLine="true"
+            android:ellipsize="end" />
+    </LinearLayout>
+
+</LinearLayout>
