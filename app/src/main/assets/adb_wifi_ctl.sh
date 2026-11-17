@@ -9,6 +9,7 @@
 BASE=/data/data/com.adbwifitoggle/files
 FLAG=$BASE/.adb_wifi_enabled
 DAEMON=$BASE/adb_wifi_daemon.sh
+PIDFILE=$BASE/adb_wifi_daemon.pid
 
 read_flag() {
     if [ -f "$FLAG" ]; then tr -d '\r' < "$FLAG" 2>/dev/null; else echo 1; fi
@@ -18,16 +19,40 @@ write_flag() {
     chmod 600 "$FLAG" 2>/dev/null
 }
 daemon_running() {
+    p=$(cat "$PIDFILE" 2>/dev/null | tr -d '\r')
+    if [ -n "$p" ] && kill -0 "$p" 2>/dev/null; then
+        return 0
+    fi
+    # Legacy fallback: daemons started before the pidfile existed.
     ps -A -o ARGS 2>/dev/null | grep -q '[a]db_wifi_daemon.sh'
 }
 start_daemon() {
     daemon_running && return 0
+    rm -f "$PIDFILE" 2>/dev/null
     nohup "$DAEMON" >/dev/null 2>&1 </dev/null &
+    # Give the daemon a moment to write its pidfile.
+    sleep 0.3 2>/dev/null || true
 }
 stop_daemon() {
-    for p in $(ps -A -o PID,ARGS 2>/dev/null | grep '[a]db_wifi_daemon.sh' | awk '{print $1}'); do
+    p=$(cat "$PIDFILE" 2>/dev/null | tr -d '\r')
+    if [ -n "$p" ]; then
         kill "$p" 2>/dev/null
+        i=0
+        while kill -0 "$p" 2>/dev/null && [ $i -lt 10 ]; do
+            sleep 0.1 2>/dev/null || true
+            i=$((i+1))
+        done
+        kill -9 "$p" 2>/dev/null
+    fi
+    # Fallback for stray/legacy daemons. Try both common ps layouts.
+    for q in $(ps -A 2>/dev/null | grep '[a]db_wifi_daemon.sh' | awk '{print $2}'); do
+        kill "$q" 2>/dev/null
     done
+    for q in $(ps -A -o PID,ARGS 2>/dev/null | grep '[a]db_wifi_daemon.sh' | awk '{print $1}'); do
+        kill "$q" 2>/dev/null
+    done
+    sleep 0.3 2>/dev/null || true
+    rm -f "$PIDFILE" 2>/dev/null
 }
 
 do_on() {
@@ -40,6 +65,8 @@ do_off() {
     write_flag 0
     settings put global adb_wifi_enabled 0 2>/dev/null
     stop_daemon
+    # Let the process exit and the pidfile vanish before callers read status.
+    sleep 0.3 2>/dev/null || true
     echo "wireless adb: OFF"
 }
 do_status() {

@@ -11,11 +11,16 @@ BASE=/data/data/com.adbwifitoggle/files
 SELF=$BASE/adb_wifi_daemon.sh
 FLAG=$BASE/.adb_wifi_enabled
 LOG=$BASE/adb_wifi_keepalive.log
+PIDFILE=$BASE/adb_wifi_daemon.pid
 
 log() { echo "[$(date '+%m-%d %H:%M:%S')] $*" >> "$LOG" 2>/dev/null; }
+cleanup() { rm -f "$PIDFILE" 2>/dev/null; }
+trap cleanup EXIT
+trap 'exit 0' INT TERM
 
 until [ "$(getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ]; do sleep 5; done
 
+echo "$$" > "$PIDFILE" 2>/dev/null
 log "daemon started, pid=$$"
 
 while true; do

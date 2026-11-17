@@ -35,7 +35,7 @@ class AdbWifiWidget : AppWidgetProvider() {
 
         // Bump together with versionCode in build.gradle.kts when a script
         // changes, so ensureDeployed() overwrites the on-device copy.
-        private const val SCRIPTS_VERSION = 4
+        private const val SCRIPTS_VERSION = 5
         private const val ASSET_CTL = "adb_wifi_ctl.sh"
         private const val ASSET_DAEMON = "adb_wifi_daemon.sh"
     }
