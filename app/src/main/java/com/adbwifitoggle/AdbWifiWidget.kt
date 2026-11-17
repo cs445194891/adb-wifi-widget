@@ -92,7 +92,7 @@ class AdbWifiWidget : AppWidgetProvider() {
         )
         views.setTextViewText(
             R.id.tvDaemon,
-            if (daemon) "守护·运行" else "守护·停止"
+            if (daemon) "运行中" else "已停止"
         )
 
         views.setTextViewText(R.id.tvIp, ip)
