@@ -9,6 +9,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -45,3 +47,19 @@ jobs:
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 90
+
+      # 把编译好的 APK 推回 gh-pages 分支，便于在无 API 令牌时用 git/SSH 直接取回安装。
+      - name: Publish APK to gh-pages branch
+        run: |
+          set -e
+          mkdir -p /tmp/apk-publish
+          cp app/build/outputs/apk/debug/*.apk /tmp/apk-publish/adb-wifi-widget-debug.apk
+          cd /tmp/apk-publish
+          git init -q
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -q -B gh-pages
+          git add adb-wifi-widget-debug.apk
+          git commit -q -m "chore: publish debug APK from run ${{ github.run_number }}" || echo "no changes to commit"
+          git push -q -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" gh-pages
+
