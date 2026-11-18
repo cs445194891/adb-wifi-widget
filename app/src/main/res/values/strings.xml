@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">ADB WiFi Toggle</string>
-    <string name="widget_desc">开关无线调试并显示 IP、端口、WiFi 与授权主机</string>
+    <string name="widget_desc">开关开发者模式、USB 调试与无线调试，并显示守护状态、IP、端口与 WiFi</string>
 </resources>

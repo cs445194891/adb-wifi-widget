@@ -11,31 +11,36 @@ import java.io.File
 import java.util.concurrent.TimeUnit
 
 /**
- * Home-screen widget for controlling wireless ADB (ADB over TLS) on a rooted device.
+ * Home-screen widget for controlling developer mode / USB debugging /
+ * wireless ADB (ADB over TLS) on a rooted device.
  *
- * The control/keepalive scripts are shipped as APK assets and self-deployed into
- * the app's private files dir on first run (no root needed to write our own dir).
- * Root is obtained via Magisk su to execute the script:
- *   <filesDir>/adb_wifi_ctl.sh {toggle|status}
+ * Scripts are shipped as APK assets and self-deployed into the app's private
+ * files dir on first run. Root is via Magisk su:
+ *   <filesDir>/adb_wifi_ctl.sh {dev_toggle|usb_toggle|wifi_toggle|status}
  *
- * Uninstall-safe: scripts live in the private dir, so uninstalling the APK
- * (adb OR via Settings/launcher) removes them; the daemon detects its own file
- * is gone and exits. No service.d / boot receiver / foreground service at all.
+ * Uninstall-safe: scripts live in the private dir, so uninstall removes them;
+ * the daemon exits when its own file disappears. No service.d / boot receiver.
  *
- * All su calls run off the main thread via goAsync() to avoid ANR.
+ * Optimistic UI: on a switch tap, the target switch image/label is pushed
+ * immediately (partiallyUpdateAppWidget) so the toggle moves without waiting
+ * for the su prompt; once the root command returns, the real state is rendered.
  */
 class AdbWifiWidget : AppWidgetProvider() {
 
     companion object {
-        private const val ACTION_TOGGLE = "com.adbwifitoggle.TOGGLE"
+        private const val ACTION_DEV = "com.adbwifitoggle.DEV"
+        private const val ACTION_USB = "com.adbwifitoggle.USB"
+        private const val ACTION_WIFI = "com.adbwifitoggle.WIFI"
         private const val ACTION_REFRESH = "com.adbwifitoggle.REFRESH"
+        private const val EXTRA_TARGET = "target"
 
-        private const val REQ_TOGGLE = 1
-        private const val REQ_REFRESH = 2
+        private const val REQ_DEV = 1
+        private const val REQ_USB = 2
+        private const val REQ_WIFI = 3
+        private const val REQ_REFRESH = 4
 
-        // Bump together with versionCode in build.gradle.kts when a script
-        // changes, so ensureDeployed() overwrites the on-device copy.
-        private const val SCRIPTS_VERSION = 5
+        // Bump with versionCode when a bundled script changes.
+        private const val SCRIPTS_VERSION = 6
         private const val ASSET_CTL = "adb_wifi_ctl.sh"
         private const val ASSET_DAEMON = "adb_wifi_daemon.sh"
     }
@@ -58,14 +63,34 @@ class AdbWifiWidget : AppWidgetProvider() {
 
     override fun onReceive(context: Context, intent: Intent) {
         when (intent.action) {
-            ACTION_TOGGLE, ACTION_REFRESH -> {
+            ACTION_DEV, ACTION_USB, ACTION_WIFI -> {
+                // 1) Optimistic update on the main thread: move the tapped switch now.
+                val target = intent.getIntExtra(EXTRA_TARGET, -1)
+                applyOptimistic(context, intent.action, target)
+
+                // 2) Run the root command off-thread, then render the real state.
                 val result = goAsync()
                 Thread {
                     try {
                         ensureDeployed(context)
-                        if (intent.action == ACTION_TOGGLE) {
-                            runRoot("${ctlPath(context)} toggle")
+                        val cmd = when (intent.action) {
+                            ACTION_DEV -> "dev_toggle"
+                            ACTION_USB -> "usb_toggle"
+                            ACTION_WIFI -> "wifi_toggle"
+                            else -> null
                         }
+                        if (cmd != null) runRoot("${ctlPath(context)} $cmd")
+                        refreshAll(context)
+                    } finally {
+                        result.finish()
+                    }
+                }.start()
+            }
+            ACTION_REFRESH -> {
+                val result = goAsync()
+                Thread {
+                    try {
+                        ensureDeployed(context)
                         refreshAll(context)
                     } finally {
                         result.finish()
@@ -74,6 +99,34 @@ class AdbWifiWidget : AppWidgetProvider() {
             }
             else -> super.onReceive(context, intent)
         }
+    }
+
+    /** Push only the tapped switch's visual so it moves before su returns. */
+    private fun applyOptimistic(context: Context, action: String?, target: Int) {
+        if (target != 0 && target != 1) return
+        val on = target == 1
+        val mgr = AppWidgetManager.getInstance(context)
+        val ids = mgr.getAppWidgetIds(ComponentName(context, AdbWifiWidget::class.java))
+        if (ids.isEmpty()) return
+        val drawable = if (on) R.drawable.switch_on else R.drawable.switch_off
+        val label = if (on) "开启" else "关闭"
+        val views = RemoteViews(context.packageName, R.layout.widget)
+        when (action) {
+            ACTION_DEV -> {
+                views.setImageViewResource(R.id.ivDevSwitch, drawable)
+                views.setTextViewText(R.id.tvDevState, label)
+            }
+            ACTION_USB -> {
+                views.setImageViewResource(R.id.ivUsbSwitch, drawable)
+                views.setTextViewText(R.id.tvUsbState, label)
+            }
+            ACTION_WIFI -> {
+                views.setImageViewResource(R.id.ivWifiSwitch, drawable)
+                views.setTextViewText(R.id.tvWifiState, label)
+            }
+            else -> return
+        }
+        mgr.partiallyUpdateAppWidget(ids, views)
     }
 
     private fun refreshAll(context: Context) {
@@ -87,7 +140,9 @@ class AdbWifiWidget : AppWidgetProvider() {
         val raw = runRoot("${ctlPath(context)} status")
         val s = parseKv(raw)
 
-        val enabled = s["enabled"] == "1"
+        val dev = s["devmode"] == "1"
+        val usb = s["usb"] == "1"
+        val wifi = s["enabled"] == "1"
         val daemon = s["daemon"] == "1"
         val ip = s["ip"] ?: "--"
         val port = s["port"] ?: "--"
@@ -95,26 +150,43 @@ class AdbWifiWidget : AppWidgetProvider() {
 
         val views = RemoteViews(context.packageName, R.layout.widget)
 
-        views.setTextViewText(R.id.tvState, if (enabled) "开启" else "关闭")
+        // Developer mode (master)
         views.setImageViewResource(
-            R.id.ivSwitch,
-            if (enabled) R.drawable.switch_on else R.drawable.switch_off
+            R.id.ivDevSwitch, if (dev) R.drawable.switch_on else R.drawable.switch_off
         )
-        views.setTextViewText(
-            R.id.tvDaemon,
-            if (daemon) "运行中" else "已停止"
-        )
+        views.setTextViewText(R.id.tvDevState, if (dev) "开启" else "关闭")
 
+        // USB debugging
+        views.setImageViewResource(
+            R.id.ivUsbSwitch, if (usb) R.drawable.switch_on else R.drawable.switch_off
+        )
+        views.setTextViewText(R.id.tvUsbState, if (usb) "开启" else "关闭")
+
+        // Wireless ADB
+        views.setImageViewResource(
+            R.id.ivWifiSwitch, if (wifi) R.drawable.switch_on else R.drawable.switch_off
+        )
+        views.setTextViewText(R.id.tvWifiState, if (wifi) "开启" else "关闭")
+
+        // Info row
+        views.setTextViewText(R.id.tvDaemon, if (daemon) "运行中" else "已停止")
         views.setTextViewText(R.id.tvIp, ip)
         views.setTextViewText(R.id.tvPort, port)
         views.setTextViewText(R.id.tvSsid, ssid)
 
-        val togglePi = PendingIntent.getBroadcast(
-            context, REQ_TOGGLE,
-            Intent(context, AdbWifiWidget::class.java).apply { action = ACTION_TOGGLE },
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        // Switch taps: carry the target value (opposite of current) for optimistic UI.
+        views.setOnClickPendingIntent(
+            R.id.devArea,
+            togglePi(context, REQ_DEV, ACTION_DEV, !dev)
         )
-        views.setOnClickPendingIntent(R.id.switchArea, togglePi)
+        views.setOnClickPendingIntent(
+            R.id.usbArea,
+            togglePi(context, REQ_USB, ACTION_USB, !usb)
+        )
+        views.setOnClickPendingIntent(
+            R.id.wifiArea,
+            togglePi(context, REQ_WIFI, ACTION_WIFI, !wifi)
+        )
 
         val refreshPi = PendingIntent.getBroadcast(
             context, REQ_REFRESH,
@@ -126,13 +198,22 @@ class AdbWifiWidget : AppWidgetProvider() {
         mgr.updateAppWidget(id, views)
     }
 
+    private fun togglePi(context: Context, req: Int, action: String, target: Boolean): PendingIntent =
+        PendingIntent.getBroadcast(
+            context, req,
+            Intent(context, AdbWifiWidget::class.java).apply {
+                this.action = action
+                putExtra(EXTRA_TARGET, if (target) 1 else 0)
+            },
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
     private fun ctlPath(context: Context): String =
         File(context.filesDir, ASSET_CTL).absolutePath
 
     /**
-     * Deploy bundled scripts into our private files dir. The app can write and
-     * chmod its own files without root (verified on-device). Redeploy when the
-     * bundled version is newer. Failure is non-fatal: status then shows "--".
+     * Deploy bundled scripts into our private files dir. Redeploy when the
+     * bundled version is newer. Failure is non-fatal (status shows "--").
      */
     private fun ensureDeployed(context: Context) {
         val dir = context.filesDir
